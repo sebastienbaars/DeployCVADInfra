@@ -1,0 +1,245 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Domains>
+<Domain name="sebaars.nl">
+    <SFConfig>
+        <SFBaseUrl>storefront.sebaars.nl</SFBaseUrl>
+        <SFServer>sf01.sebaars.nl</SFServer>
+        <SFVersion>2203</SFVersion>
+        <SFClusterPasscodeFile>.\passcode.txt</SFClusterPasscodeFile>
+            <Stores>
+                <Store name="StoreWeb">
+                    <AccessGateway>True</AccessGateway>
+                    <AggregationGroup>True</AggregationGroup>
+		            <DefaultWebsite>True</DefaultWebsite>
+		            <ChangeDefaultICA>False</ChangeDefaultICA>
+                    <FAS>False</FAS>
+                </Store>    
+             </Stores>
+        <SessionTimeoutInterval>3</SessionTimeoutInterval>
+        <Farms>
+            <Farm name="SeBaars" DC="1" TYPE="XenDesktop" STA="True">
+                <Srv>xd01.sebaars.nl</Srv>
+                <Srv>xd02.sebaars.nl</Srv>
+		        <XMLPort>443</XMLPort>
+                <TransportType>HTTPS</TransportType>
+            </Farm>
+            <Farm name="Baars" DC="2" TYPE="XenDesktop" STA="True">
+                <Srv>xd01.baars.nl</Srv>
+                <Srv>xd02.baars.nl</Srv>
+		        <XMLPort>443</XMLPort>
+                <TransportType>HTTPS</TransportType>
+            </Farm>
+        </Farms>
+        <AccessGateways>
+            <AccessGateway Default="False" HDXRouting="False">
+                <name>SEBAARS-Gateway-1</name>
+                <url>https://portaal.sebaars.nl</url>
+		        <CallBackURL>https://callback-site1.gslb.sebaars.nl</CallBackURL>
+                <VIP>192.168.100.120</VIP>
+                <StoreName>StoreWeb</StoreName>
+            </AccessGateway>
+            <AccessGateway Default="True" HDXRouting="False">
+                <name>BAARS-Gateway-1</name>
+                <url>https://portaal.sebaars.nl</url>
+		        <CallBackURL>https://callback-site2.gslb.sebaars.nl</CallBackURL>
+                <VIP>192.168.100.121</VIP>
+                <StoreName>StoreWeb</StoreName>
+            </AccessGateway>
+        </AccessGateways>
+        <HostEntries>
+            <HostEntry>
+            </HostEntry>
+        </HostEntries>
+        <Certificaten>
+            <Certificaat name="SFBaseURL">
+                <CertPath>.\storefront_sebaars_nl.pfx</CertPath>
+                <CertStore>Cert:\LocalMachine\My</CertStore>
+                <CertSubject>CN=$SFBaseUrl</CertSubject>
+                <CertencryptPassword>geheimwachtwoord</CertencryptPassword>
+                <BindIIS>True</BindIIS>
+            </Certificaat>
+        </Certificaten>
+        <AggregationGroups>
+            <AggregationGroup name="AggregationGroup1" AreIdentical="False">
+				<StoreName>StoreWeb</StoreName>
+                <UserFarmMappingName name="VDI_Site01Users01">
+                    <ADGroupsName>
+                        <ADGroupName>VDIUsers1</ADGroupName>
+                    </ADGroupsName> 
+                    <LoadBalanceMode>Failover</LoadBalanceMode>
+		            <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
+                    <AggregatedDeliveryControllers>
+                        <Controllers>SEBAARS</Controllers>
+                        <Controllers>BAARS</Controllers>
+                    </AggregatedDeliveryControllers>
+                </UserFarmMappingName>
+                <UserFarmMappingName name="VDI_Site01Users02">
+                    <ADGroupsName>
+                        <ADGroupName>VDIUsers2</ADGroupName>
+                    </ADGroupsName> 
+                    <LoadBalanceMode>Failover</LoadBalanceMode>
+		            <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
+                    <AggregatedDeliveryControllers>
+                        <Controllers>BAARS</Controllers>
+                        <Controllers>SEBAARS</Controllers>
+                    </AggregatedDeliveryControllers>
+                </UserFarmMappingName>
+            </AggregationGroup>
+        </AggregationGroups>
+		<DefaultICA>
+            <ICAEntries>
+                <ICAEntry>
+               </ICAEntry>
+            </ICAEntries>
+        </DefaultICA>
+    </SFConfig>
+    <XDConfig>
+        <Version>2203</Version>
+        <SiteAdmins>
+            <SiteAdmin name="VDI_Admins">
+                <Role>Full Administrator</Role>
+            </SiteAdmin>
+            <SiteAdmin name="VDI_ServiceDesk">
+                <Role>Help Desk Administrator</Role>
+            </SiteAdmin>
+        </SiteAdmins>
+		<CertencryptPassword>geheimwachtwoord</CertencryptPassword>
+    </XDConfig>
+	<PVS>
+        <version>2203</version>
+		<DFSrConfig>
+            <FileNameExclu>~*, *.bak, *.tmp, *.lok</FileNameExclu>
+            <DirectoryExclu>WriteCache</DirectoryExclu>
+            <DfsrStagingPathQuota>50096</DfsrStagingPathQuota>
+        </DFSrConfig>
+        <Farms>
+            <Farm name="FAP01">
+                <DBServer>SQL01.sebaars.nl</DBServer>
+                <DBPort>1433</DBPort>
+                <DBName>PVS-Sebaars</DBName>
+                <CTXLicensingServer>ls.sebaars.nl</CTXLicensingServer>
+                <Sites>
+                    <Site name="SeBaars">
+                        <StoreName>Store</StoreName>
+                        <PVSServers> <!--  -->
+                            <PVSServer name="PVS01">
+                                    <NIC name="KA-NIC">
+                                    <IfIndex>10</IfIndex> <!-- Get-NetIPInterface voor het achterhalen van de IfIndex -->
+                                    <IP>192.168.1.20</IP>
+                                    <PrefixLength>24</PrefixLength>
+                                    <NetworkBinding>False</NetworkBinding>
+                                </NIC>
+                                <NIC name="PVS-NIC">
+                                    <IfIndex>12</IfIndex>  <!-- Get-NetIPInterface voor het achterhalen van de IfIndex -->
+                                    <IP>192.168.10.10</IP>
+                                    <PrefixLength>24</PrefixLength>
+                                    <NetworkBinding>True</NetworkBinding>  <!-- Door deze optie op True te zetten worden de PVS specifieke componenten actief -->
+                                </NIC>
+                            </PVSServer>
+                            <PVSServer name="PVS02">
+                                <NIC name="KA-NIC">
+                                    <IfIndex>11</IfIndex> <!-- Get-NetIPInterface voor het achterhalen van de IfIndex -->
+                                    <IP>192.168.1.21</IP>
+                                    <PrefixLength>24</PrefixLength>
+                                    <NetworkBinding>False</NetworkBinding>
+                                </NIC>
+                                <NIC name="PVS-NIC">
+                                    <IfIndex>6</IfIndex> <!-- Get-NetIPInterface voor het achterhalen van de IfIndex -->
+                                    <IP>192.168.10.11</IP>
+                                    <PrefixLength>24</PrefixLength>
+                                    <NetworkBinding>True</NetworkBinding>
+                                </NIC>
+                            </PVSServer>
+						</PVSServers>
+                    </Site>
+                </Sites>
+            </Farm>
+        </Farms>
+		<NetworkBindings>  <!-- Hier worden de NIC specifieke componenten uit of aangezet.  -->
+            <NetworkBinding Name="File and Printer Sharing for Microsoft Networks">
+                <Value>False</Value>
+            </NetworkBinding>
+            <NetworkBinding Name="Client for Microsoft Networks">
+                <Value>False</Value>
+            </NetworkBinding>
+            <NetworkBinding Name="Microsoft Network Adapter Multiplexor Protocol">
+                <Value>False</Value>
+            </NetworkBinding>
+            <NetworkBinding Name="QoS Packet Scheduler">
+                <Value>False</Value>
+            </NetworkBinding>
+        </NetworkBindings>		
+        <Settings>
+            <Setting Name="EventLoggingEnabled">
+                <Value>$True</Value>
+            </Setting>
+            <Setting Name="PowerRating">
+                <Value>1</Value>
+            </Setting>
+            <Setting Name="LastPort">
+                <Value>7350</Value>
+             </Setting>
+            <Setting Name="FirstPort">
+                <Value>7000</Value>
+            </Setting>
+            <Setting Name="AdMaxPasswordAge">
+                <Value>7</Value>
+            </Setting>
+            <Setting Name="ThreadsPerPort">
+                <Value>12</Value>
+            </Setting>
+            <Setting Name="BuffersPerThread">
+                <Value>24</Value>
+            </Setting>
+            <Setting Name="ServerCacheTimeout">
+                <Value>8</Value>
+            </Setting>
+            <Setting Name="LocalConcurrentIoLimit">
+                <Value>0</Value>
+            </Setting>
+            <Setting Name="RemoteConcurrentIoLimit">
+                <Value>4</Value>
+            </Setting>
+            <Setting Name="MaxTransmissionUnits">
+                <Value>1506</Value>
+            </Setting>
+            <Setting Name="IoBurstSize">
+                <Value>32768</Value>
+            </Setting>
+            <Setting Name="NonBlockingIoEnabled">
+                <Value>$True</Value>
+            </Setting>
+            <Setting Name="BootPauseSeconds">
+                <Value>10</Value>
+            </Setting>
+            <Setting Name="MaxBootSeconds">
+                <Value>60</Value>
+            </Setting>
+            <Setting Name="MaxBootDevicesAllowed">
+                <Value>1000</Value>
+            </Setting>
+            <Setting Name="vDiskCreatePacing">
+                <Value>0</Value>
+            </Setting>
+            <Setting Name="LicenseTimeout">
+                <Value>30</Value>
+            </Setting>
+        </Settings>
+    </PVS>
+    <DirectorConfig>
+		<Directorversion>2203</Directorversion>
+		<DesktopDirectorURL>director.sebaars.nl</DesktopDirectorURL>
+		<XenDesktopDDCs>xd01.sebaars.nl,xd02.sebaars.nl,xd01.baars.nl,xd02.sebaars.nl</XenDesktopDDCs>
+		<DefaultWebsite>True</DefaultWebsite>
+		<Certificaten>
+			<Certificaat name="DesktopDirector">
+				<CertPath>director_sebaars_nl.pfx</CertPath>
+				<CertStore>Cert:\LocalMachine\My</CertStore>
+				<CertSubject>CN=$DesktopDirectorURL</CertSubject>
+				<CertencryptPassword>geheimwachtwoord</CertencryptPassword>
+				<BindIIS>True</BindIIS>
+			</Certificaat>
+		</Certificaten>
+	</DirectorConfig>
+    </Domain>
+</Domains>
