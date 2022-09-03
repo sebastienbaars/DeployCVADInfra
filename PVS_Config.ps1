@@ -3,7 +3,7 @@
    	**********************************************************************************************************
 	Powershell script to configure Citrix Provisioning Services
 
-	Operating system			: Windows Server 2019
+	Operating system			: Windows Server 2019 GUI
 	Commandline parameters		: CreatevDiskStore,PVSWindowsFeatureReq,DisableTCPoffload.Afconfig
 	Author(s)				    : S.N. Baars
 	Version					    : 0.0.4
