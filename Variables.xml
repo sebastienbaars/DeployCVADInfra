@@ -37,7 +37,7 @@
             <Farm name="Baars" DC="2" TYPE="XenDesktop" STA="True">
                 <Srv>xd01.baars.nl</Srv>
                 <Srv>xd02.baars.nl</Srv>
-		        <XMLPort>443</XMLPort>
+		<XMLPort>443</XMLPort>
                 <TransportType>HTTPS</TransportType>
             </Farm>
         </Farms>
@@ -45,14 +45,14 @@
             <AccessGateway Default="False" HDXRouting="False">
                 <name>SEBAARS-Gateway-1</name>
                 <url>https://portaal.sebaars.nl</url>
-		        <CallBackURL>https://callback-site1.gslb.sebaars.nl</CallBackURL>
+		<CallBackURL>https://callback-site1.gslb.sebaars.nl</CallBackURL>
                 <VIP>192.168.100.120</VIP>
                 <StoreName>StoreWeb</StoreName>
             </AccessGateway>
             <AccessGateway Default="True" HDXRouting="False">
                 <name>BAARS-Gateway-1</name>
                 <url>https://portaal.sebaars.nl</url>
-		        <CallBackURL>https://callback-site2.gslb.sebaars.nl</CallBackURL>
+		<CallBackURL>https://callback-site2.gslb.sebaars.nl</CallBackURL>
                 <VIP>192.168.100.121</VIP>
                 <StoreName>StoreWeb</StoreName>
             </AccessGateway>
@@ -72,16 +72,16 @@
         </Certificaten>
         <AggregationGroups>
             <AggregationGroup name="AggregationGroup1" AreIdentical="False">
-				<StoreName>StoreWeb</StoreName>
+		<StoreName>StoreWeb</StoreName>
                 <UserFarmMappingName name="VDI_Site01Users01">
-                    <ADGroupsName>
-                        <ADGroupName>VDIUsers1</ADGroupName>
-                    </ADGroupsName> 
+                <ADGroupsName>
+                	<ADGroupName>VDIUsers1</ADGroupName>
+                </ADGroupsName> 
                     <LoadBalanceMode>Failover</LoadBalanceMode>
-		            <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
+		    <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
                     <AggregatedDeliveryControllers>
-                        <Controllers>SEBAARS</Controllers>
-                        <Controllers>BAARS</Controllers>
+                    	<Controllers>SEBAARS</Controllers>
+                    	<Controllers>BAARS</Controllers>
                     </AggregatedDeliveryControllers>
                 </UserFarmMappingName>
                 <UserFarmMappingName name="VDI_Site01Users02">
@@ -89,7 +89,7 @@
                         <ADGroupName>VDIUsers2</ADGroupName>
                     </ADGroupsName> 
                     <LoadBalanceMode>Failover</LoadBalanceMode>
-		            <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
+		    <EquivalentFarmSet>AggregationGroup1</EquivalentFarmSet>
                     <AggregatedDeliveryControllers>
                         <Controllers>BAARS</Controllers>
                         <Controllers>SEBAARS</Controllers>
@@ -97,7 +97,7 @@
                 </UserFarmMappingName>
             </AggregationGroup>
         </AggregationGroups>
-		<DefaultICA>
+	<DefaultICA>
             <ICAEntries>
                 <ICAEntry>
                </ICAEntry>
