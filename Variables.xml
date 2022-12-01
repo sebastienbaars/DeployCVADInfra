@@ -6,13 +6,24 @@
         <SFServer>sf01.sebaars.nl</SFServer>
         <SFVersion>2203</SFVersion>
         <SFClusterPasscodeFile>.\passcode.txt</SFClusterPasscodeFile>
+	<Settings>
+            <SessionTimeoutInterval>3</SessionTimeoutInterval>
+            <AutoLaunchDesktop>True</AutoLaunchDesktop>
+            <HTML5Receiver>Fallback</HTML5Receiver>
+            <Html5SingleTabLaunch>True</Html5SingleTabLaunch>
+            <LogoffAction>Disconnect</LogoffAction>
+        </Settings>
             <Stores>
                 <Store name="StoreWeb">
                     <AccessGateway>True</AccessGateway>
                     <AggregationGroup>True</AggregationGroup>
-		            <DefaultWebsite>True</DefaultWebsite>
-		            <ChangeDefaultICA>False</ChangeDefaultICA>
+		    <DefaultWebsite>True</DefaultWebsite>
+		    <ChangeDefaultICA>False</ChangeDefaultICA>
                     <FAS>False</FAS>
+	            <KeyWords value="true">
+                        <exclude></exclude>
+                        <include></include>
+                    </KeyWords>
                 </Store>    
              </Stores>
         <SessionTimeoutInterval>3</SessionTimeoutInterval>
@@ -20,7 +31,7 @@
             <Farm name="SeBaars" DC="1" TYPE="XenDesktop" STA="True">
                 <Srv>xd01.sebaars.nl</Srv>
                 <Srv>xd02.sebaars.nl</Srv>
-		        <XMLPort>443</XMLPort>
+		<XMLPort>443</XMLPort>
                 <TransportType>HTTPS</TransportType>
             </Farm>
             <Farm name="Baars" DC="2" TYPE="XenDesktop" STA="True">
