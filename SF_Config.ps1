@@ -1,7 +1,6 @@
-﻿<#
+<#
 	**********************************************************************************************************
 	Configure Storefront
-
 	Operating system			: Windows Server 2019 GUI
 	Commandline parameters		: ConfigFile
 	Requirements				: Citrix Storefront and importmodules.ps1 (Snapin)
@@ -9,23 +8,22 @@
 	Version						: 0.5
 	Date						: 03-09-2022
 	Tags						: Storefront, VDI, XenDesktop
-
 	ScriptEngine				: Powershell
-
 	Version  Date        Author    Changelog
 	----------------------------------------------------------------------------------------------------------
 	0.1    14-10-2016  SNB        Initial
     0.4    11-04-2018  SNB        CallBackURL toegevoegd in de functie en XML bestand
     0.5    10-07-2018  SNB        Toevoegen van de WebCustomizing voor het laten zien op welke SF je aanwezig bent
     0.7    20-03-2019  SNB        DefaultICA in de variables gezet.
-	0.8	   24-06-2019  RB         $GatewaySTAUrls aangepast van http:// naar https://
+    0.8	   24-06-2019  RB         $GatewaySTAUrls aangepast van http:// naar https://
     0.9    09-07-2019  AVDK       Toevoegen van Application Setting tbv CurrentServer
     1.0    29-08-2019  AVDK       CleanUp_StoreFront in 2 delen gesplitst ivm reboot
     1.3    15-04-2020  SNB        Wijzigen van de Gateway's, AggratieGroepen en Receiver Detectie-methode.
     1.4    25-04-2020  SNB        VIP toegevoegd aan de CAG configuratie.
     1.5    04-02-2021  SNB        Foreach toegevoegd aan de AggregationGroups en StopScript gefixt. 
     1.6    12-02-2021  AVDK       Disable IIS Httplogging + Disable Scheduletask Cleanup IIS Logs
-	1.7	   18-5-2021   RB         Scheduledtask creation /V1 /RU SYSTEM toegevoegd voor server 2019
+    1.7	   18-5-2021   RB         Scheduledtask creation /V1 /RU SYSTEM toegevoegd voor server 2019
+    1.8    1-12-2022   SNB        Fix Gateway issues, adding XML-options for Session Control
  
 	**********************************************************************************************************
 #>
@@ -66,7 +64,7 @@ $domain = (Get-WmiObject Win32_ComputerSystem).Domain
 [XML]$xmldocument = Get-Content -Path $ConfigFile
 $DomainLocal = $xmldocument.Domains.Domain | Where-Object {$_.name -eq "$domain"}
 $VARs = $DomainLocal.SFConfig
-$ADDomain = (Get-ADDomain).NetBIOSName
+$ADDomain = ((Get-WmiObject Win32_NTDomain).DomainName | Out-String).Trim()
 
 # StoreFront Settings
 $SFBaseUrl = $VARs.SFBaseUrl
@@ -74,13 +72,18 @@ $SFVersion = $VARs.SFVersion
 $SFServer = $VARs.SFServer
 $SFClusterPasscodeFile = $VARs.SFClusterPasscodeFile
 $Stores = @($VARs.Stores.Store.name)
-$SessionTimeoutInterval = $VARs.SessionTimeoutInterval
 $JoinScript = "JoinScript.ps1"
 $StopScript = "StopScript.ps1"
 $DefaultWebSiteStore = $VARs.Stores.Store | Where-Object {$_.DefaultWebsite -eq "True"}
 $DefaultWebsite = $DefaultWebSiteStore.name + "Web"
 $DefaultICAEntries = $Vars.DefaultICA.ICAEntries.ICAEntry
 $StoresChangeDefaultICA = $Vars.Stores.Store | Where-Object {$_.ChangeDefaultICA -eq "True"}
+
+$SFSettings = $VARs.Settings
+$SessionTimeoutInterval = $SFSettings.SessionTimeoutInterval
+$HTML5Receiver = $SFSettings.HTML5Receiver
+$LogoffAction = $SFSettings.LogoffAction
+
 
 # FarmSettings
 $XDFarm1 = $VARs.Farms.Farm | Where-Object {$_.DC -eq "1" -and $_.TYPE -eq "XenDesktop"}
@@ -109,6 +112,9 @@ $AggregationGroups = $VARs.AggregationGroups.AggregationGroup
 
 #FAS
 $FASStores = @($VARS.Stores.Store | Where-Object {$_.FAS -eq "True"})
+
+#KeyWords
+$KeyWordStores = $VARs.Stores.store | Where-Object {$_.KeyWords.Value -eq "True"}
 
 #region LoadModules
  <#-------------------------------------------
@@ -144,34 +150,6 @@ Import-Module $SNB_PSModule -Force
     DoLog ("End creating Farms to Store " + (Get-Date).ToString() + "")
 }
 #endregion Create AddFarm function
-
-<#region Create AddDNStoHostsFile
-    Function AddDNStoHostsFile($DNSName) {
-    $HostsFile = Get-Content C:\Windows\system32\drivers\etc\hosts | Select-String $DNSName -Quiet
-    If ($HostsFile -eq $null) {
-        $FileName = "C:\Windows\system32\drivers\etc\hosts"
-        $Pattern = "#	::1             localhost"
-        $FileOriginal = Get-Content $FileName
-        [String[]] $FileModified = @() 
-        Foreach ($Line in $FileOriginal)
-        {   
-            $FileModified += $Line
-            if ($Line -match $pattern) 
-            {
-                #Add Lines after the selected pattern 
-                $FileModified += "$DNSName"
-                } 
-            }
-            Set-Content $fileName $FileModified
-            DoLog ("Added $DNSName to the HostFile " + (Get-Date).ToString() + "")
-            }
-            Else {
-                DoLogWarning (" $DNSName was already added to the HostsFile" + (Get-Date).ToString() + "")
-            }
-    DoLog (" ------ End Adding $DNSName to the HostFile ------ " + (Get-Date).ToString() + "")
-}
-#endregion Create AddDNStoHostsFile
-#>
 
 #region SFConfigure function
     Function SFConfigure {
@@ -265,21 +243,27 @@ Import-Module $SNB_PSModule -Force
     DoLog (" ------ End Activate the Unified Receiver Experience as default ------ " + (Get-Date).ToString() + "")
     #endregion Activate the Unified Receiver Experience as default
 
-    #region Disable Desktop Autolaunch
-    DoLog (" ------ Start Disable Desktop Autolaunch ------ " + (Get-Date).ToString() + "")
+    #region Set Autolaunch Desktop
+    DoLog (" ------ Start Set Autolaunch Desktop ------ " + (Get-Date).ToString() + "")
     ForEach ($WebStore in $WebStores) {
     $StoreUI = Get-STFWebReceiverUserInterface -WebReceiverService $WebStore
-    If ($StoreUI.AutoLaunchDesktop -eq $True) {
-        DoLog (" ------  change Disable Desktop Autolaunch on $WebStore ------ " + (Get-Date).ToString() + "")
-            Set-STFWebReceiverUserInterface -WebReceiverService $WebStore -AutoLaunchDesktop $False
-        DoLog (" ------  changed Disable Desktop Autolaunch on $WebStore ------ " + (Get-Date).ToString() + "")
+    If ($SFSettings.AutoLaunchDesktop -eq "False") {
+        [bool]$AutoLaunchDesktop = $False
+        }
+    If ($SFSettings.AutoLaunchDesktop -eq "True") {
+        [bool]$AutoLaunchDesktop = $True
+        }
+    If ($StoreUI.AutoLaunchDesktop -ne $AutoLaunchDesktop) {
+        DoLog (" ------  change  Autolaunch Desktop  on $WebStore ------ " + (Get-Date).ToString() + "")
+            Set-STFWebReceiverUserInterface -WebReceiverService $WebStore -AutoLaunchDesktop $AutoLaunchDesktop
+        DoLog (" ------  changed Autolaunch Desktop on $WebStore ------ " + (Get-Date).ToString() + "")
         }
         Else {
-            DoLogWarning (" ------  The Disable Desktop Autolaunch on $WebStore was already changed------ " + (Get-Date).ToString() + "")
+            DoLogWarning (" ------  The Autolaunch Desktop on $WebStore was already changed------ " + (Get-Date).ToString() + "")
         }
     }
-    DoLog (" ------ End Disable Desktop Autolaunch ------ " + (Get-Date).ToString() + "")
-    #endregion Disable Desktop Autolaunch
+    DoLog (" ------ End Set Autolaunch Desktop ------ " + (Get-Date).ToString() + "")
+    #endregion Set Autolaunch Desktop
 
     #region Disable "Activate" Option in WebPage
     DoLog (" ------ Start Disable ""Activate"" Option in WebPage ------ " + (Get-Date).ToString() + "")
@@ -297,37 +281,39 @@ Import-Module $SNB_PSModule -Force
     DoLog (" ------ End Disable ""Activate"" Option in WebPage ------ " + (Get-Date).ToString() + "")
     #endregion Disable "Activate" Option in WebPage
 
-    #region Change the Storefront layout with no Citrix Logos    
-    DoLog (" ------ Start change the Storefront layout fwith no Citrix Logos  ------ " + (Get-Date).ToString() + "")  
+    #region Change the Storefront layout    
+    DoLog (" ------ Start change the Storefront layout with  ------ " + (Get-Date).ToString() + "")  
     ForEach ($Webstore in $Webstores) {
     $WebStoreName = $WebStore.FriendlyName
-        DoLog (" ------ Start change the Storefront layout with no Citrix Logos  for $WebStore ------ " + (Get-Date).ToString() + "")
-            Copy-Item -Path "$Deploytemp\custom\style.css" -Destination "$wwwrootFolder\Citrix\$WebStoreName\custom\style.css" -Force -Confirm:$False
-            Copy-Item -Path "$Deploytemp\custom\strings.en.js" -Destination "$wwwrootFolder\Citrix\$WebStoreName\custom\strings.en.js" -Force -Confirm:$False
-            Copy-Item -Path "$Deploytemp\custom\strings.nl.js" -Destination "$wwwrootFolder\Citrix\$WebStoreName\custom\strings.nl.js" -Force -Confirm:$False
-			Copy-Item -Path "$Deploytemp\custom\script.js" -Destination "$wwwrootFolder\Citrix\$WebStoreName\custom\script.js" -Force -Confirm:$False
-			Copy-Item -path "$DeployTemp\customweb\ServerIdentifier.aspx" -Destination "$wwwrootFolder\Citrix\$WebStoreName\customweb\ServerIdentifier.aspx" -Force -Confirm:$False
-        DoLog (" ------ Changed the Storefront layout with no Citrix Logos  for $WebStore ------ " + (Get-Date).ToString() + "")
+        DoLog (" ------ Start change the Storefront layout for $WebStore ------ " + (Get-Date).ToString() + "")
+            Copy-Item -Path "$Deploytemp\custom\*" -Destination "$wwwrootFolder\Citrix\$WebStoreName\custom\" -Force -Confirm:$False -Recurse
+        DoLog (" ------ Changed the Storefront layout for $WebStore ------ " + (Get-Date).ToString() + "")
     }
-    DoLog (" ------ End change the Storefront layout with no Citrix Logos  ------ " + (Get-Date).ToString() + "")
-    #endregion Change the Storefront layout with no Citrix Logos    
+    DoLog (" ------ End change the Storefront layout  ------ " + (Get-Date).ToString() + "")
+    #endregion Change the Storefront layout    
 
-    #region Disable the plugin assistant
-    DoLog (" ------ Start Disable the plugin assistant ------ " + (Get-Date).ToString() + "")
+    #region change the plugin assistant
+    DoLog (" ------ Start Change the plugin assistant ------ " + (Get-Date).ToString() + "")
     ForEach ($WebStore in $WebStores) {
     $WebStoreName = $WebStore.FriendlyName
     $StorePA = Get-STFWebReceiverPluginAssistant -WebReceiverService $WebStore
-    If (!($StorePA.Enabled -eq $False -and $StorePA.ProtocolHandler.Enabled -eq $False -and $StorePA.Html5.Enabled -eq "Off")) {
-        DoLog (" ------  change Disable the plugin assistant on $WebStore ------ " + (Get-Date).ToString() + "")
-            Set-STFWebReceiverPluginAssistant -WebReceiverService $WebStore -Enabled $False -ProtocolHandlerEnabled $False -Html5Enabled Off
-        DoLog (" ------  changed Disable the plugin assistant on $WebStore ------ " + (Get-Date).ToString() + "")
+    If ($SFSettings.Html5SingleTabLaunch -eq "False") {
+        [bool]$Html5SingleTabLaunch = $False
+        }
+    If ($SFSettings.AutoLaunchDesktop -eq "True") {
+        [bool]$Html5SingleTabLaunch = $True
+        }
+    If (($StorePA.Enabled -ne $False) -or ($StorePA.ProtocolHandler.Enabled -ne $False) -or ($StorePA.Html5.Enabled -ne "$HTML5Receiver") -or ($StorePA.html5.SingleTabLaunch -ne $Html5SingleTabLaunch)) {
+        DoLog (" ------  change the plugin assistant on $WebStore ------ " + (Get-Date).ToString() + "")
+            Set-STFWebReceiverPluginAssistant -WebReceiverService $WebStore -Enabled $False -ProtocolHandlerEnabled $False -Html5SingleTabLaunch $Html5SingleTabLaunch -Html5Enabled $HTML5Receiver
+        DoLog (" ------  changed the plugin assistant on $WebStore ------ " + (Get-Date).ToString() + "")
         }
         Else {
-            DoLogWarning (" ------  The Disable the plugin assistant on $WebStore was already changed------ " + (Get-Date).ToString() + "")
+            DoLogWarning (" ------  The plugin assistant on $WebStore was already changed------ " + (Get-Date).ToString() + "")
         }
     }
     DoLog (" ------ End Disable the plugin assistant ------ " + (Get-Date).ToString() + "")
-    #endregion Disable the plugin assistant   
+    #endregion change the plugin assistant   
 
     #region change the default view to Desktops
     DoLog (" ------ Start change the default view to Desktops ------ " + (Get-Date).ToString() + "")
@@ -367,7 +353,7 @@ Import-Module $SNB_PSModule -Force
     $AuthStoreCO = Get-STFExplicitCommonOptions -AuthenticationService $AuthStore
     If (!($AuthStoreCO.DomainSelection -eq "$ADDomain")) {
         DoLog (" ------  change Trusted Domain on $AuthStore ------ " + (Get-Date).ToString() + "")
-            Set-STFExplicitCommonOptions -AuthenticationService $AuthStore -Domains $ADDomain -DefaultDomain $ADDomain -HideDomainField $True
+            Set-STFExplicitCommonOptions -AuthenticationService $AuthStore -Domains "$ADDomain" -DefaultDomain "$ADDomain" -HideDomainField $True
         DoLog (" ------  changed Trusted Domain on $AuthStore ------ " + (Get-Date).ToString() + "")
         }
         Else {
@@ -408,9 +394,9 @@ Import-Module $SNB_PSModule -Force
     DoLog (" ------ Start WorkSpaceControl Settings ------ " + (Get-Date).ToString() + "")
     ForEach ($WebStore in $WebStores) {
     $WebStoreWSC = Get-STFWebReceiverService -VirtualPath $WebStore.VirtualPath
-    If (!($WebStoreWSC.WebReceiver.ClientSettings.UserInterface.WorkspaceControl.LogoffAction -eq "None")) {
+    If ($WebStoreWSC.WebReceiver.ClientSettings.UserInterface.WorkspaceControl.LogoffAction -ne "$LogoffAction") {
         DoLog (" ------  change WorkSpaceControl Settings on $WebStore ------ " + (Get-Date).ToString() + "")
-            Set-STFWebReceiverUserInterface -WorkspaceControlEnabled $True -WorkspaceControlAutoReconnectAtLogon $False -WorkspaceControlLogoffAction None -WorkspaceControlShowReconnectButton $True -WorkspaceControlShowDisconnectButton $True -WebReceiverService $WebStore
+            Set-STFWebReceiverUserInterface -WorkspaceControlEnabled $True -WorkspaceControlAutoReconnectAtLogon $False -WorkspaceControlLogoffAction $LogoffAction -WorkspaceControlShowReconnectButton $True -WorkspaceControlShowDisconnectButton $True -AppShortcutsAllowSessionReconnect $True -WebReceiverService $WebStore
         DoLog (" ------  changed WorkSpaceControl Settings on $WebStore ------ " + (Get-Date).ToString() + "")
         }
         Else {
@@ -810,7 +796,7 @@ If ($Config){
                             Else {
                                 DoLogWarning (" $GatewayName has already been created in StoreFront  or is for HDXRouting " + (Get-Date).ToString() + "")
                             }
-                        If (!($GWStore -match $GatewayName) -and $Gateway.HDXRouting -eq "False") {
+                        If (($GWStore -ne $GatewayName) -and ($Gateway.HDXRouting -eq "False")) {
                             $GatewayServ = Get-STFRoamingGateway -Name $GatewayName
                             If ($Gateway | Where-Object {$_.Default -eq "true"}) {
                                 Dolog (" Enable Remote Access on the $GatewayStoreName and add $GatewayName to the Store as default " + (Get-Date).ToString() + "")
@@ -916,6 +902,53 @@ If ($Config){
                 }
             #endregion Create the AggregationGroups
 
+            #region Configure KeyWords on Stores
+            DoLog (" Start Configure KeyWords " + (Get-Date).ToString() + "")
+            If ($KeyWordStores.KeyWords.Value -eq "True") {
+            ForEach ($KeyWordStore in $KeyWordStores) {
+                    $KeyWordStoreName = $KeyWordStore.name
+                    $KeyWordStoreService = Get-STFStoreService -VirtualPath /Citrix/$KeyWordStoreName
+                    $KeyWordStoreExclude = $KeyWordStore.KeyWords.exclude
+                    $KeyWordStoreInclude = $KeyWordStore.KeyWords.include
+                    If ($KeyWordStoreExclude -ne $IsNullOrEmpty) {
+                        $KeyWordSetExclude = (Get-STFStoreEnumerationOptions -StoreService $KeyWordStoreService).FilterByKeywordsExclude
+                        If (($KeyWordSetExclude -ne $IsNullOrEmpty) -or ($KeyWordSetExclude -ne $KeyWordStoreExclude)) {
+                        DoLog (" Configure KeyWords Exclude for $KeyWordStoreName " + (Get-Date).ToString() + "")
+                            Set-STFStoreEnumerationOptions -FilterByKeywordsExclude $KeyWordStoreExclude -StoreService $KeyWordStoreService
+                        DoLog (" Configured KeyWords Exclude for $KeyWordStoreName " + (Get-Date).ToString() + "")
+                        }
+                    Else {
+                            DoLog (" No KeyWords Exclude for $KeyWordStoreName found, doing nothing " + (Get-Date).ToString() + "")
+                        }
+                    }
+                    If ($KeyWordStoreInclude -ne $IsNullOrEmpty) {
+                        $KeyWordSetInclude = (Get-STFStoreEnumerationOptions -StoreService $KeyWordStoreService).FilterByKeywordsInclude
+                        If (($KeyWordSetInclude -ne $IsNullOrEmpty) -or ($KeyWordSetInclude -ne $KeyWordStoreInclude)) {
+                        DoLog (" Configure KeyWords Exclude for $KeyWordStoreName " + (Get-Date).ToString() + "")
+                            Set-STFStoreEnumerationOptions -FilterByKeywordsInclude $KeyWordStoreInclude -StoreService $KeyWordStoreService
+                        DoLog (" Configured KeyWords Exclude for $KeyWordStoreName " + (Get-Date).ToString() + "")
+                        }
+                    Else {
+                            DoLog (" No KeyWords Include for $KeyWordStoreName found, doing nothing " + (Get-Date).ToString() + "")
+                        }
+                    }
+                }
+                DoLog (" No KeyWords found set, doing nothing " + (Get-Date).ToString() + "")
+            }
+
+
+            DoLog (" End Configure KeyWords " + (Get-Date).ToString() + "")
+            #endregion Configure KeyWords on Stores
+
+            
+            
+            
+            
+            
+            
+            
+            
+            
             #endregion Configure Storefront Configuration
 			
             SFConfigure
@@ -1053,10 +1086,8 @@ If ($AppSetting){
             Dolog ("Start Application Setting " + (Get-Date).ToString() + "")
             $ServerNumber = $env:computername.Substring($env:computername.Length-1)
             $ServerLocation = switch ($env:computername.Split("W")[0].Substring($env:computername.Split("W")[0].Length-1)) {
-                                                         0 { "1" } # Den Helder
-                                                         4 { "2" } # Maasland
-                                                         7 { "3" } # Woensdrecht
-
+                                                         a { "a" } # Ambachtweg
+                                                         b { "b" } # Bastiondreef
                                           }
             Dolog ("Hostname: $env:COMPUTERNAME, dus CurrentServer: $ServerLocation$ServerNumber " + (Get-Date).ToString() + "")
             # als de ServerIdentifier in IIS gedefinieerd onder de Citrix Virtual Directory;
